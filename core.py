@@ -1,5 +1,8 @@
 from blist import sortedlist, blist
 import pickle
+import spacy
+import string
+
 
 class InvertedIndex():
     """
@@ -45,6 +48,107 @@ class InvertedIndex():
     def load(filename):
         with open(filename, 'rb') as filehandler:
             return pickle.load(filehandler)
+
+    def worker_function(args):
+
+        sharedqueue, batomic = args
+
+        stop_words = spacy.lang.en.STOP_WORDS
+        punctuations = string.punctuation
+
+        index = InvertedIndex([])
+
+        nlp = spacy.load("en", disable=["parser","textcat"])
+
+        i=0
+        l=0
+        while batomic.get() or (not sharedqueue.empty()):
+            try:
+                text, document = sharedqueue.get(False,500+random.randint(0, 1000))
+                index.add_doc(document)
+                doc = nlp(text)
+                i+=1
+                ## 0. parse the xml
+                ## 1. term -> (doc, freq)
+                ## Posting(i, count[0])
+                ## string.pontuation
+                ## stop_words, lowercase , pontuation, symbols, nouns, apply lemmanizer  (all in the doc object spacy doc)
+                ## do steaming
+                ## 2. maybe build extra terms for entities doc.ents_
+                ## 3. improve to Posting(i, count[0], positions) if they are required by the project statement.
+                ## 4. make sure Postings are ordered by document id.
+                ## 5. do document -> terms sparse matrix.
+
+            except :
+                print("except")
+                l+=1
+                None
+
+        ## inverted index sumarizer.
+        ## obtain the term count.
+        """
+        countv = CountVectorizer(input="filename", tokenizer=LemmaTokenizer(),lowercase=True, stop_words=None)
+
+
+        fmat = countv.fit_transform(documents)
+        index = InvertedIndex(documents)
+
+        for w, i in countv.vocabulary_.items():
+            v = fmat[:,i]
+            ix = v.nonzero()[0]
+            plist = []
+            for i,count in zip(ix,v[ix].toarray()):
+                plist.append( Posting(i, count[0]) )
+
+            index[w] = Postings(plist, csr_matrix.getnnz(v))
+
+
+        """
+        print("[Worker]End of one thread")
+        index = InvertedIndex([])
+
+        return index
+
+    def reduce_function(args):
+        indexes, d_start, sharedqueue = args
+        tmp = blist([])
+
+        while not sharedqueue.empty():
+            try:
+                k = sharedqueue.get(False,100+random.randint(0, 100))
+            except:
+                break
+            s = 0
+            j = 0
+            indj = 0
+            dlist = sortedlist([])
+            for ind in indexes:
+                if k in ind :
+                    dlist.add(ind[k])
+
+            for i in range(1,len(dlist)):
+                dlist[i].dlist = d_start[i] + dlist[i].dlist
+
+            while len(dlist) > 1:
+                p1 = dlist[0]
+                p2 = dlist[1]
+
+                base = sortedlist([])
+                base.update(p1.dlist)
+                base.update(p2.dlist)
+
+                r = Postings(base, p1.count + p2.count, False)
+
+                dlist.discard(p1)
+                dlist.discard(p2)
+
+                dlist.add(r)
+
+            tmp.append( (k,dlist[0]) )
+
+        print("[Reduce]End of one thread")
+
+        return tmp
 
 
 class Postings():

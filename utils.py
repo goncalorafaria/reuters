@@ -1,6 +1,10 @@
 from contextlib import contextmanager
 from threading  import Lock
 
+
+def cleanxml(text):
+    return text
+
 class RWLock(object):
     """ RWLock class; this is meant to allow an object to be read from by
         multiple threads, but only written to by a single thread at a time. See:
@@ -80,4 +84,3 @@ class AtomicBool():
     def set(self,value):
         with self.lock.w_locked():
             self.b= value
-

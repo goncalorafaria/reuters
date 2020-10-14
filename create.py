@@ -5,133 +5,36 @@ import threading
 import concurrent.futures
 from blist import sortedlist, blist
 
-from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
 import spacy
 import string
 
 from queue import Queue
-from utils import AtomicBool
+
 import random
+
+from utils import AtomicBool
+from core import InvertedIndex
 
 ## InvertedIndex : Terms -> Postings
 ## Pstings: Term , [Posting]
 
 def reader_function(args):
-    docs, sharedqueue, batomic = args
+    docs, sharedqueue, batomic, clean_function = args
     print("number of docs:" + str(len(docs)))
     for d in docs :
         with open(d,"r") as  df:
-            sharedqueue.put( (df.read(),d) )
+            sharedqueue.put( (clean_function(df.read()),d) )
 
     batomic.set(False)
 
-def worker_function(args):
 
-    sharedqueue, batomic = args
-
-    stop_words = spacy.lang.en.STOP_WORDS
-    punctuations = string.punctuation
-
-    index = InvertedIndex([])
-
-    nlp = spacy.load("en", disable=["parser","textcat"])
-
-    tokenizer = Tokenizer(nlp.vocab)
-    i=0
-    l=0
-    while batomic.get() or (not sharedqueue.empty()):
-        try:
-            text, document = sharedqueue.get(False,500+random.randint(0, 1000))
-            index.add_doc(document)
-            doc = nlp(text)
-            i+=1
-            ## 0. parse the xml
-            ## 1. term -> (doc, freq)
-            ## Posting(i, count[0])
-            ## string.pontuation
-            ## stop_words, lowercase , pontuation, symbols, nouns, apply lemmanizer  (all in the doc object spacy doc)
-            ## do steaming
-            ## 2. maybe build extra terms for entities doc.ents_
-            ## 3. improve to Posting(i, count[0], positions) if they are required by the project statement.
-            ## 4. make sure Postings are ordered by document id.
-
-        except :
-            print("except")
-            l+=1
-            None
-
-    ## inverted index sumarizer.
-    ## obtain the term count.
-    """
-    countv = CountVectorizer(input="filename", tokenizer=LemmaTokenizer(),lowercase=True, stop_words=None)
-
-
-    fmat = countv.fit_transform(documents)
-    index = InvertedIndex(documents)
-
-    for w, i in countv.vocabulary_.items():
-        v = fmat[:,i]
-        ix = v.nonzero()[0]
-        plist = []
-        for i,count in zip(ix,v[ix].toarray()):
-            plist.append( Posting(i, count[0]) )
-
-        index[w] = Postings(plist, csr_matrix.getnnz(v))
-
-
-    """
-    print("[Worker]End of one thread")
-    index = InvertedIndex([])
-
-    return index
-
-def reduce_function(args):
-    indexes, d_start, sharedqueue = args
-    tmp = blist([])
-
-    while not sharedqueue.empty():
-        try:
-            k = sharedqueue.get(False,100+random.randint(0, 100))
-        except:
-            break
-        s = 0
-        j = 0
-        indj = 0
-        dlist = sortedlist([])
-        for ind in indexes:
-            if k in ind :
-                dlist.add(ind[k])
-
-        for i in range(1,len(dlist)):
-            dlist[i].dlist = d_start[i] + dlist[i].dlist
-
-        while len(dlist) > 1:
-            p1 = dlist[0]
-            p2 = dlist[1]
-
-            base = sortedlist([])
-            base.update(p1.dlist)
-            base.update(p2.dlist)
-
-            r = Postings(base, p1.count + p2.count, False)
-
-            dlist.discard(p1)
-            dlist.discard(p2)
-
-            dlist.add(r)
-
-        tmp.append( (k,dlist[0]) )
-
-    print("[Reduce]End of one thread")
-
-    return tmp
-
-
-def process_documents(documents, worker_function,reduce_function, NUM_WORKERS, executor, QUEUE_SIZE=500, NUM_READERS=2):
+def process_documents(documents, worker_function,reduce_function, clean_function, NUM_WORKERS, QUEUE_SIZE=500, NUM_READERS=2):
     document_number= len(documents)
 
     workers = []
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=NUM_WORKERS+NUM_READERS-1)
 
     docs_per_thread = document_number//NUM_READERS
     #reduces_per_thread = NUM_WORKERS//NUM_WORKERS
@@ -146,9 +49,9 @@ def process_documents(documents, worker_function,reduce_function, NUM_WORKERS, e
     ## creates NUM_READERS reader tasks.
     for i in range(NUM_READERS):
         if i+1 == NUM_READERS:
-            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal) )
+            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal,  clean_function) )
         else:
-            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal) )
+            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal,  clean_function) )
 
 
     ## puts the worker threads reading the and processing the documents.
@@ -215,7 +118,7 @@ def process_documents(documents, worker_function,reduce_function, NUM_WORKERS, e
 
 # In[11]:
 
-create_inverted_index = lambda documents, NUM_WORKERS, executor : process_documents(documents, worker_function, reduce_function, NUM_WORKERS, executor)
+#create_inverted_index = lambda documents, NUM_WORKERS, executor : process_documents(documents, worker_function, reduce_function, NUM_WORKERS, executor)
 #iindex = process_documents(documents, worker_function, reduce_function, NUM_WORKERS=6)
 
 
