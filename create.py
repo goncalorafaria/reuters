@@ -15,6 +15,7 @@ import random
 
 from utils import AtomicBool
 from core import InvertedIndex
+from tqdm import tqdm
 
 ## InvertedIndex : Terms -> Postings
 ## Pstings: Term , [Posting]
@@ -22,14 +23,18 @@ from core import InvertedIndex
 def reader_function(args):
     docs, sharedqueue, batomic, clean_function = args
     print("number of docs:" + str(len(docs)))
-    for d in docs :
+    for d in tqdm(docs) :
         with open(d,"r") as  df:
             sharedqueue.put( (clean_function(df.read()),d) )
 
     batomic.set(False)
 
 
-def process_documents(documents, worker_function,reduce_function, clean_function, NUM_WORKERS, QUEUE_SIZE=500, NUM_READERS=2):
+def process_documents(documents, worker_function,reduce_function, clean_function, NUM_WORKERS=3, QUEUE_SIZE=20, NUM_READERS=1):
+
+    assert NUM_WORKERS > 0, " Must have  a postive number of workers"
+    assert NUM_READERS > 0, " Must have  a postive number of readers"
+
     document_number= len(documents)
 
     workers = []
@@ -115,11 +120,3 @@ def process_documents(documents, worker_function,reduce_function, clean_function
             rindex[k] = v
 
         return rindex
-
-# In[11]:
-
-#create_inverted_index = lambda documents, NUM_WORKERS, executor : process_documents(documents, worker_function, reduce_function, NUM_WORKERS, executor)
-#iindex = process_documents(documents, worker_function, reduce_function, NUM_WORKERS=6)
-
-
-# In[ ]:

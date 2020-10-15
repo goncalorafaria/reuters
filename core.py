@@ -1,6 +1,7 @@
 from blist import sortedlist, blist
 import pickle
 import spacy
+import random
 import string
 
 
@@ -56,17 +57,17 @@ class InvertedIndex():
         stop_words = spacy.lang.en.STOP_WORDS
         punctuations = string.punctuation
 
-        index = InvertedIndex([])
-
         nlp = spacy.load("en", disable=["parser","textcat"])
 
         i=0
         l=0
+        docsnames = []
         while batomic.get() or (not sharedqueue.empty()):
             try:
                 text, document = sharedqueue.get(False,500+random.randint(0, 1000))
-                index.add_doc(document)
+                #print(document)
                 doc = nlp(text)
+                docsnames.append(document)
                 i+=1
                 ## 0. parse the xml
                 ## 1. term -> (doc, freq)
@@ -79,8 +80,8 @@ class InvertedIndex():
                 ## 4. make sure Postings are ordered by document id.
                 ## 5. do document -> terms sparse matrix.
 
-            except :
-                print("except")
+            except Exception as e:
+                print(e)
                 l+=1
                 None
 
@@ -105,7 +106,7 @@ class InvertedIndex():
 
         """
         print("[Worker]End of one thread")
-        index = InvertedIndex([])
+        index = InvertedIndex(docsnames)
 
         return index
 

@@ -1,86 +1,64 @@
-from contextlib import contextmanager
-from threading  import Lock
-
+import threading
 
 def cleanxml(text):
+    ## need to be implemented somehow
     return text
+"""Simple reader-writer locks in Python
+Many readers can hold the lock XOR one and only one writer"""
 
-class RWLock(object):
-    """ RWLock class; this is meant to allow an object to be read from by
-        multiple threads, but only written to by a single thread at a time. See:
-        https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock
-        Usage:
-            from rwlock import RWLock
-            my_obj_rwlock = RWLock()
-            # When reading from my_obj:
-            with my_obj_rwlock.r_locked():
-                do_read_only_things_with(my_obj)
-            # When writing to my_obj:
-            with my_obj_rwlock.w_locked():
-                mutate(my_obj)
-    """
+class RWLock:
+    """ A lock object that allows many simultaneous "read locks", but
+    only one "write lock." """
 
     def __init__(self):
+        self._read_ready = threading.Condition(threading.Lock(  ))
+        self._readers = 0
 
-        self.w_lock = Lock()
-        self.num_r_lock = Lock()
-        self.num_r = 0
-
-    # ___________________________________________________________________
-    # Reading methods.
-
-    def r_acquire(self):
-        self.num_r_lock.acquire()
-        self.num_r += 1
-        if self.num_r == 1:
-            self.w_lock.acquire()
-        self.num_r_lock.release()
-
-    def r_release(self):
-        assert self.num_r > 0
-        self.num_r_lock.acquire()
-        self.num_r -= 1
-        if self.num_r == 0:
-            self.w_lock.release()
-        self.num_r_lock.release()
-
-    @contextmanager
-    def r_locked(self):
-        """ This method is designed to be used via the `with` statement. """
+    def acquire_read(self):
+        """ Acquire a read lock. Blocks only if a thread has
+        acquired the write lock. """
+        self._read_ready.acquire(  )
         try:
-            self.r_acquire()
-            yield
+            self._readers += 1
         finally:
-            self.r_release()
+            self._read_ready.release(  )
 
-    # ___________________________________________________________________
-    # Writing methods.
-
-    def w_acquire(self):
-        self.w_lock.acquire()
-
-    def w_release(self):
-        self.w_lock.release()
-
-    @contextmanager
-    def w_locked(self):
-        """ This method is designed to be used via the `with` statement. """
+    def release_read(self):
+        """ Release a read lock. """
+        self._read_ready.acquire(  )
         try:
-            self.w_acquire()
-            yield
+            self._readers -= 1
+            if not self._readers:
+                self._read_ready.notifyAll(  )
         finally:
-            self.w_release()
+            self._read_ready.release(  )
+
+    def acquire_write(self):
+        """ Acquire a write lock. Blocks until there are no
+        acquired read or write locks. """
+        self._read_ready.acquire(  )
+        while self._readers > 0:
+            self._read_ready.wait(  )
+
+    def release_write(self):
+        """ Release a write lock. """
+        self._read_ready.release(  )
 
 class AtomicBool():
     def __init__(self, initialvalue=True):
         self.b=initialvalue
-        self.lock = RWLock()
+        self.rwl = RWLock()
 
     def get(self):
-        with self.lock.r_locked():
+        try:
+            self.rwl.acquire_read()
             b = self.b
-        return b
+        finally:
+            self.rwl.release_read()
 
     def set(self,value):
-        with self.lock.w_locked():
+        try:
+            self.rwl.acquire_write()
             self.b= value
+        finally:
+            self.rwl.release_write()
