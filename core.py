@@ -3,6 +3,10 @@ import pickle
 import spacy
 import random
 import string
+from lxml import etree as etree_lxml
+
+from os.path import join, isfile
+
 
 
 class InvertedIndex():
@@ -215,3 +219,64 @@ class Posting():
     def __radd__(self,value):
         self.id_+= value
         return self
+
+class DocChunks():
+    def __init__(self, docs, sdir):
+        self.docs = docs
+        self.sdir = sdir
+        self.count = len(docs)
+
+    def dump(self,id_):
+        filename = join(self.sdir,"bin/chunk"+str(id_))
+        with open(filename, 'wb') as filehandler:
+            pickle.dump(self, filehandler)
+
+    def load(sdir,id_):
+        filename = join(sdir,"bin/chunk"+str(id_))
+        with open(filename, 'rb') as filehandler:
+            return pickle.load(filehandler)
+
+    def add(self, chunk):
+        for i in chunk.docs :
+            self.docs.append(i)
+            self.count += 1
+
+    def worker_function(args):
+        sharedqueue, batomic = args
+
+        #docsnames = []
+        tmp = blist([])
+
+        while batomic.get() or (not sharedqueue.empty()):
+            try:
+                xml_as_bytes, document = sharedqueue.get(False,500+random.randint(0, 1000))
+                tree = etree_lxml.fromstring(xml_as_bytes)
+                dt = blist([])
+                for text in tree.findall('./text', {}):
+                    for line in text:
+                         dt.append(line.text)
+
+                #texts = [ line.text for line in text for text in tree.findall('./text', {})]
+                headline = tree.find('./headline', {}).text
+                itemid = tree.find('.', {}).attrib["itemid"]
+                mdline =  tree.find('./dateline', {})
+
+                if mdline is not None:
+                    dateline = mdline.text
+                else :
+                    dateline = None
+
+                doc = {
+                    "text":dt,
+                    "headline":headline,
+                    "itemid":itemid,
+                    "dateline":dateline,
+                    "fname": document
+                }
+
+                tmp.append(doc)
+
+            except Exception as e:
+                #print(e)
+                None
+        return DocChunks(tmp, ".")

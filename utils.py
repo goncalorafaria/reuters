@@ -1,8 +1,10 @@
 import threading
+from lxml import etree
 
-def cleanxml(text):
-    ## need to be implemented somehow
-    return text
+#etree.XPath("//text()")( etree.fromstring(text) )
+#etree.fromstring(text)
+# for element in root.iter("text"):
+
 """Simple reader-writer locks in Python
 Many readers can hold the lock XOR one and only one writer"""
 
@@ -55,6 +57,8 @@ class AtomicBool():
             b = self.b
         finally:
             self.rwl.release_read()
+
+        return b
 
     def set(self,value):
         try:
