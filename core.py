@@ -226,13 +226,13 @@ class DocChunks():
         self.sdir = sdir
         self.count = len(docs)
 
-    def dump(self,id_):
-        filename = join(self.sdir,"bin/chunk"+str(id_))
+    def dump(self,id_, name="chunk"):
+        filename = join(self.sdir,"bin/"+ name + str(id_))
         with open(filename, 'wb') as filehandler:
             pickle.dump(self, filehandler)
 
-    def load(sdir,id_):
-        filename = join(sdir,"bin/chunk"+str(id_))
+    def load(sdir,id_, name="chunk"):
+        filename = join(sdir,"bin/" + name + str(id_))
         with open(filename, 'rb') as filehandler:
             return pickle.load(filehandler)
 
@@ -267,7 +267,7 @@ class DocChunks():
                     dateline = None
 
                 doc = {
-                    "text":dt,
+                    "text": " ".join(dt),
                     "headline":headline,
                     "itemid":itemid,
                     "dateline":dateline,

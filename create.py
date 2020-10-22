@@ -122,7 +122,36 @@ def index_documents(documents, worker_function,reduce_function,NUM_WORKERS=3, QU
 
         return rindex
 
+def process_topics(path="./topics.txt",dir="."):
+    docs = []
 
+    with open(path, "r") as xml:
+        s = xml.read()
+        for topic in s.split("<top>")[1:]:
+            desc=[]
+            narr=[]
+            cache=None
+            for i in topic.split("\n") :
+                if i != "" :
+                    reg = i.split(">")
+
+                    if reg[0] == "<narr":
+                        cache = narr
+                    elif reg[0] == '</top':
+                        None
+                    elif reg[0] == '<num':
+                        code = reg[1].split(" ")[-1]
+                    elif reg[0] == '<title':
+                        title = " ".join(reg[1].split(" ")[1:])
+                    elif reg[0] == '<desc':
+                        cache=desc
+                    else:
+                        cache.append(reg[0])
+
+            entry = {"desc":" ".join(desc),"narr":" ".join(narr),"title":title,"code":code}
+            docs.append(entry)
+
+    DocChunks(docs,dir).dump(0,name="topicchunk")
 
 def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, NUM_READERS=1,dir="."):
 
