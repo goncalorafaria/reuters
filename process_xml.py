@@ -1,11 +1,9 @@
 import glob
 import os
 from time import time
-import concurrent.futures
 
-from core import InvertedIndex, DocChunks
+from core import BucketChunks
 from create import process_documents, process_topics
-from lxml import etree as etree_lxml
 
 
 #documents = glob.glob("exampletxt/*.txt")
@@ -19,7 +17,7 @@ process_topics(path="./topics.txt")
 
 process_documents(
     documents = documents,
-    worker_function = DocChunks.worker_function, ## maps collection into invertedIndexes objects.
+    worker_function = BucketChunks.worker_function, ## maps collection into invertedIndexes objects.
     NUM_WORKERS = 5, ## number of threads executing in the first stage the worker function , and in the second stage the reduce function.
     QUEUE_SIZE = 80, ## number of documents in queue at every single point.
     NUM_READERS = 2,

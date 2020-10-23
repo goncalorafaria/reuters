@@ -1,9 +1,4 @@
 import threading
-from lxml import etree
-
-#etree.XPath("//text()")( etree.fromstring(text) )
-#etree.fromstring(text)
-# for element in root.iter("text"):
 
 """Simple reader-writer locks in Python
 Many readers can hold the lock XOR one and only one writer"""
@@ -45,6 +40,7 @@ class RWLock:
     def release_write(self):
         """ Release a write lock. """
         self._read_ready.release(  )
+
 
 class AtomicBool():
     def __init__(self, initialvalue=True):

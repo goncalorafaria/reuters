@@ -1,5 +1,3 @@
-import glob
-import sys
 from time import time
 
 import os, os.path
@@ -8,27 +6,12 @@ from whoosh import index
 from whoosh.fields import *
 from whoosh.analysis import *
 
-from core import InvertedIndex, DocChunks
-from create import process_documents, process_topics
-from lxml import etree as etree_lxml
-
-from random import randrange
+from core import BucketChunks
 
 #assert len(sys.argv) > 1, "You need to specify the number of chunks."
 
 
-"""
-w = myindex.writer()
-# Get the analyzer object from a text field
-stem_ana = w.schema["content"].format.analyzer
-# Set the cachesize to -1 to indicate unbounded caching
-stem_ana.cachesize = -1
-# Reset the analyzer to pick up the changed attribute
-stem_ana.clear()
-"""
-
-
-def work(it, topics):
+def work(it):
 
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")
@@ -51,10 +34,10 @@ def work(it, topics):
     j = 0
     for i in it:
         print( "Processing the chunk: " + str(i) )
-        doc = DocChunks.load(".", i)
+        doc = BucketChunks.load(".", i)
 
-        for fname, d in tqdm(doc.items()):
-            writer.add_document(name=fname,headline=d["headline"], content=d["text"])
+        for d in tqdm(doc.docs):
+            writer.add_document(name=d["fname"],headline=d["headline"], content=d["text"])
 
         writer.commit()
         writer = ix.writer(procs=4, limitmb=2048, batchsize=5000, multisegment=True)
@@ -70,10 +53,8 @@ if __name__ == '__main__':
 
     start_time = time()
 
-    topics = DocChunks.load(".", 0,"topicchunk")
-
     SHARDS = int(sys.argv[1])
 
-    work(range(SHARDS),topics)
+    work(range(SHARDS))
 
     print("--- %s seconds ---" % (time() - start_time))
