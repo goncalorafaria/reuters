@@ -6,7 +6,7 @@ import os, os.path
 from tqdm import tqdm
 from whoosh import index
 from whoosh.fields import *
-from whoosh.writing import AsyncWriter
+from whoosh.analysis import *
 
 from core import InvertedIndex, DocChunks
 from create import process_documents, process_topics
@@ -28,16 +28,18 @@ stem_ana.clear()
 """
 
 
-def work(_id, topics):
-
-    print( "Processing the chunk: " + str(_id) )
-
-    doc = DocChunks.load(".", _id)
+def work(it, topics):
 
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")
 
-    schema = Schema(headline = TEXT, content=TEXT)
+    #anah = CommaSeparatedTokenizer() |  IntraWordFilter(mergewords=False) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
+    ana = RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
+
+    schema = Schema(headline = KEYWORD(lowercase=True, field_boost=2.0,analyzer=ana),
+                    content= TEXT(lang="en" ,analyzer=ana),
+                    name=ID(unique=True,stored=True))
+
     ix = index.create_in("indexdir", schema=schema, indexname="usages")
     #ix = index.open_dir("indexdir", indexname="usages")
     writer = ix.writer(procs=4, limitmb=2048, batchsize=5000, multisegment=True)
@@ -46,12 +48,19 @@ def work(_id, topics):
     #   stem_ana = writer.schema[field].format.analyzer
     #   stem_ana.cachesize = -1
     #   stem_ana.clear()
+    j = 0
+    for i in it:
+        print( "Processing the chunk: " + str(i) )
+        doc = DocChunks.load(".", i)
 
-    for d in tqdm(doc.docs):
-        writer.add_document(headline=d["headline"], content=d["text"])
+        for d in tqdm(doc.docs):
+            writer.add_document(name=d["fname"],headline=d["headline"], content=d["text"])
+        
+        writer.commit()
+        writer = ix.writer(procs=4, limitmb=2048, batchsize=5000, multisegment=True)
 
-    print("commiting")
-    writer.commit()
+        del doc
+        j+=1
 
 
 if __name__ == '__main__':
@@ -64,7 +73,7 @@ if __name__ == '__main__':
     topics = DocChunks.load(".", 0,"topicchunk")
 
     SHARDS = int(sys.argv[1])
-    for i in range(SHARDS):
-        work(i,topics)
+
+    work(range(SHARDS),topics)
 
     print("--- %s seconds ---" % (time() - start_time))

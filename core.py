@@ -6,6 +6,7 @@ import string
 from lxml import etree as etree_lxml
 
 from os.path import join, isfile
+import spacy
 
 
 
@@ -245,7 +246,12 @@ class DocChunks():
         sharedqueue, batomic = args
 
         #docsnames = []
+        nlp = spacy.load("en", disable=[
+            "parser", "ner","entity_linker","textcat",
+            "entity_ruler","sentencizer","merge_noun_chunks",
+            "merge_entities","merge_subtokens"])
         tmp = blist([])
+        stream = blist([])
 
         while batomic.get() or (not sharedqueue.empty()):
             try:
@@ -261,16 +267,24 @@ class DocChunks():
                 itemid = tree.find('.', {}).attrib["itemid"]
                 mdline =  tree.find('./dateline', {})
 
+                del xml_as_bytes
+                del tree
+
                 if mdline is not None:
                     dateline = mdline.text
                 else :
                     dateline = None
 
+                stream.append(" ".join(dt))
+                stream.append(headline)
+                #"text": " ".join([ token.lemma_ for token in nlp(" ".join(dt))]),
+                #"headline": " ".join([ token.lemma_ for token in nlp(headline) if not (token.is_punct or token.is_stop) ]),
+
                 doc = {
-                    "text": " ".join(dt),
-                    "headline":headline,
-                    "itemid":itemid,
-                    "dateline":dateline,
+                    "text": " ".join(dt),#" ".join([ token.lemma_ for token in nlp(" ".join(dt)) if not (token.is_punct or token.is_stop) ]),
+                    "headline": headline,#" ".join([ token.lemma_ for token in nlp(headline) if not (token.is_punct or token.is_stop) ]),
+                    "itemid": itemid,
+                    "dateline": dateline,
                     "fname": document
                 }
 
@@ -279,4 +293,5 @@ class DocChunks():
             except Exception as e:
                 #print(e)
                 None
+
         return DocChunks(tmp, ".")

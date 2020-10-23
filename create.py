@@ -21,13 +21,16 @@ from tqdm import tqdm
 ## Pstings: Term , [Posting]
 
 def reader_function(args):
-    docs, sharedqueue, batomic = args
+    docs, sharedqueue, batomic , id, barrier = args
     print("number of docs:" + str(len(docs)))
     for d in tqdm(docs):
         with open(d,"rb") as df:
             sharedqueue.put( (df.read(),d) )
 
     print("out of the reader.")
+
+    barrier.wait()
+
     batomic.set(False)
 
 
@@ -53,11 +56,13 @@ def index_documents(documents, worker_function,reduce_function,NUM_WORKERS=3, QU
     signal = AtomicBool(True)
 
     ## creates NUM_READERS reader tasks.
+    latomic = [AtomicBool(False) for _ in range(NUM_READERS)]
+
     for i in range(NUM_READERS):
         if i+1 == NUM_READERS:
-            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal) )
+            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal, i, latomic) )
         else:
-            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal) )
+            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal, i, latomic) )
 
 
     ## puts the worker threads reading the and processing the documents.
@@ -173,12 +178,13 @@ def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, 
     ## atomic boolean implemented with RWLock
     # it says if the readers are or are not still working
     signal = AtomicBool(True)
+    barrier = threading.Barrier(NUM_READERS, timeout=5000)
     ## creates NUM_READERS reader tasks.
     for i in range(NUM_READERS):
         if i+1 == NUM_READERS:
-            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal) )
+            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal, i, barrier) )
         else:
-            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal) )
+            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal, i, barrier) )
 
     ## puts the worker threads reading the and processing the documents.
     if NUM_WORKERS > 1 :
