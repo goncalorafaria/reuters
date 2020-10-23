@@ -53,9 +53,9 @@ def work(it, topics):
         print( "Processing the chunk: " + str(i) )
         doc = DocChunks.load(".", i)
 
-        for d in tqdm(doc.docs):
-            writer.add_document(name=d["fname"],headline=d["headline"], content=d["text"])
-        
+        for fname, d in tqdm(doc.items()):
+            writer.add_document(name=fname,headline=d["headline"], content=d["text"])
+
         writer.commit()
         writer = ix.writer(procs=4, limitmb=2048, batchsize=5000, multisegment=True)
 

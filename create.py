@@ -128,7 +128,7 @@ def index_documents(documents, worker_function,reduce_function,NUM_WORKERS=3, QU
         return rindex
 
 def process_topics(path="./topics.txt",dir="."):
-    docs = []
+    docs = {}
 
     with open(path, "r") as xml:
         s = xml.read()
@@ -153,10 +153,11 @@ def process_topics(path="./topics.txt",dir="."):
                     else:
                         cache.append(reg[0])
 
-            entry = {"desc":" ".join(desc),"narr":" ".join(narr),"title":title,"code":code}
-            docs.append(entry)
+            entry = {"desc":" ".join(desc),"narr":" ".join(narr),"title":title}
 
-    DocChunks(docs,dir).dump(0,name="topicchunk")
+            docs[code] = entry
+
+    DocChunks(docs, None,dir, index=False).dump(0,name="topicchunk")
 
 def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, NUM_READERS=1,dir="."):
 
@@ -201,12 +202,16 @@ def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, 
         indexes[0].sdir = dir
         return indexes[0]
     else:
-
         ndocs = sum([ i.count for i in indexes ])
-        docs  = [ j for i in indexes for j in i.docs ]
+
+        docs   = blist([ j for i in indexes for j in i.docs ])
+        fnames = blist([ j for i in indexes for j in i.docind.keys() ])
         shards = ndocs//NUM_WORKERS
 
         for i in range(NUM_WORKERS-1):
-            DocChunks(blist(docs[i*shards:(i+1)*shards]), dir).dump(i)
+            DocChunks(
+                docs[i*shards:(i+1)*shards], fnames[i*shards:(i+1)*shards], dir).dump( i )
 
-        DocChunks(blist(docs[(NUM_WORKERS-1)*shards:]),dir).dump(NUM_WORKERS-1)
+        i = NUM_WORKERS-1
+        DocChunks(
+                docs[i*shards:], fnames[i*shards:], dir).dump( i )
