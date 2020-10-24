@@ -10,8 +10,7 @@ from core import BucketChunks
 
 #assert len(sys.argv) > 1, "You need to specify the number of chunks."
 
-
-def work(it):
+def work(it, sdir):
 
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")
@@ -21,7 +20,7 @@ def work(it):
 
     schema = Schema(headline = KEYWORD(lowercase=True, field_boost=2.0,analyzer=ana),
                     content= TEXT(lang="en" ,analyzer=ana),
-                    name=ID(unique=True,stored=True))
+                    name=ID(unique=True, stored=True, sortable=True))
 
     ix = index.create_in("indexdir", schema=schema, indexname="usages")
     #ix = index.open_dir("indexdir", indexname="usages")
@@ -34,10 +33,10 @@ def work(it):
     j = 0
     for i in it:
         print( "Processing the chunk: " + str(i) )
-        doc = BucketChunks.load(".", i)
+        doc = BucketChunks.load(sdir, i)
 
         for d in tqdm(doc.docs):
-            writer.add_document(name=d["fname"],headline=d["headline"], content=d["text"])
+            writer.add_document(name=d["itemid"],headline=d["headline"], content=d["text"])
 
         writer.commit()
         writer = ix.writer(procs=4, limitmb=2048, batchsize=5000, multisegment=True)
@@ -45,16 +44,20 @@ def work(it):
         del doc
         j+=1
 
-
-if __name__ == '__main__':
-
-    assert len(sys.argv) > 1, "specify the number of shards."
-    assert int(sys.argv[1]) > 0, "number of shards must be a positive number."
-
+def build_index(num_shards=5, sdir="."):
+    #assert len(sys.argv) > 1, "specify the number of shards."
+    #assert int(sys.argv[1]) > 0, "number of shards must be a positive number."
+    #SHARDS = int(sys.argv[1])
     start_time = time()
 
+    work(range(num_shards),sdir)
+
+    return (time() - start_time)
+
+if __name__ == '__main__':
+    assert len(sys.argv) > 1, "specify the number of shards."
+    assert int(sys.argv[1]) > 0, "number of shards must be a positive number."
     SHARDS = int(sys.argv[1])
 
-    work(range(SHARDS))
-
-    print("--- %s seconds ---" % (time() - start_time))
+    timetaken = build_index(num_shards=5)
+    print("--- %s seconds ---" % (timetaken))

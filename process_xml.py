@@ -12,8 +12,6 @@ documents = [ i for a in os.listdir("../proj/rcv1/") for i in glob.glob("../proj
 #documents =documents[:20000]
 
 start_time = time()
-process_topics(path="./topics.txt")
-
 
 process_documents(
     documents = documents,

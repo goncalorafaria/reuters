@@ -1,6 +1,7 @@
 import threading
 import concurrent.futures
 from blist import blist
+from os.path import join
 
 from queue import Queue
 
@@ -61,6 +62,8 @@ def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, 
 
     assert NUM_WORKERS > 0, " Must have  a postive number of workers"
     assert NUM_READERS > 0, " Must have  a postive number of readers"
+
+    process_topics(path= join(dir,"topics.txt"))
 
     document_number= len(documents)
 
