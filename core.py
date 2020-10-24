@@ -6,6 +6,8 @@ from whoosh.qparser import *
 from whoosh.classify import Bo1Model, Bo2Model, KLModel
 from whoosh.scoring import *
 from enum import Enum
+from utils import parse_boolean_query
+from time import time
 
 from os.path import join
 from whoosh import index
@@ -96,13 +98,11 @@ class BucketChunks():
 
         return BucketChunks(tmp, ktmp, ".", index=True)
 
-
 class Bucket():
     Model = Enum("Model"," ".join(['BM25F','DFREE','PL2','TF_IDF','FREQUENCY'] ))
     model_calls = [ BM25F(), DFree(), PL2(), TF_IDF(), Frequency()]
     Extension = Enum("Extension"," ".join(["Bo1","Bo2","KL"]))
     extension_calls = [Bo1Model, Bo2Model, KLModel]
-
 
     def __init__(
             self, sdir=".",
@@ -121,19 +121,6 @@ class Bucket():
         #print(weighting.value)
         self.weighting = Bucket.model_calls[weighting.value-1]
 
-    def query(self, query, limit=10, terms=False, sortedby="name"):
-
-        q = MultifieldParser(["headline","content"],self.ix.schema, group=OrGroup).parse(query)
-
-        with self.ix.searcher(weighting=self.weighting) as searcher:
-            if not terms:
-                results = searcher.search(q,  limit=limit, terms=terms)
-                results = [r.values()[0] for r in results]
-            else :
-                results = searcher.search(q,  limit=limit, terms=terms, sortedby=sortedby)
-
-        return results
-
     def boolean_query(self, qcode, expantion, k=5):
 
         self.set_weighting_method(Bucket.Model.FREQUENCY)
@@ -142,17 +129,40 @@ class Bucket():
                     code=qcode, limit=k,
                     expantion=expantion)
 
-        query = " ".join(tt)
+        query = parse_boolean_query(tt)
 
-        return self.query(query, limit=None, terms=True, sortedby="name")
+        with self.ix.searcher(weighting=self.weighting) as searcher:
+            results = searcher.search(query,  limit=None, sortedby="name")
+            results = [ r.values()[0] for r in results]
 
-    def ranking(self, qcode, expantion, model, limit=20):
+        return results
+
+    def query(self, q, limit=10, sortedby="name", sort=False):
+
+        with self.ix.searcher(weighting=self.weighting) as searcher:
+            if not sort:
+                results = searcher.search(q,  limit=limit)
+            else :
+                results = searcher.search(q,  limit=limit, sortedby=sortedby)
+
+        return results
+
+    def ranking(self, qcode, model, limit=20):
 
         self.set_weighting_method(model)
 
         topic = self.topics.docs[qcode]
 
-        return self.query(topic["narr"] + "  "+ topic["title"], limit=limit)
+        #group=OrGroup
+        q = MultifieldParser(["headline","content"],
+                    self.ix.schema,group=OrGroup).parse(topic["narr"]+"  "+topic["title"])
+
+        with self.ix.searcher(weighting=self.weighting) as searcher:
+                results = searcher.search(q,  limit=limit)
+
+                r = [ (searcher.stored_fields(id_)["name"], sc) for id_,sc in results.items() ]
+
+        return r
 
     def get_topics_terms(self,code, expantion, limit=5):
 

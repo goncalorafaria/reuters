@@ -1,4 +1,48 @@
 import threading
+from whoosh.query import Term, And,Or
+
+"""
+This function returns the power set.
+    eg. powerset( {1,2}, 2) = [ [], [1], [2], [1,2] ]
+
+"""
+def powerset( s, size):
+    if size > 0:
+        elem = s.pop()
+        r = powerset(s, size-1)
+
+        for ss in list(r):
+            ns = list(ss[0])
+            c = ss[1] + 1
+            ns.append(elem)
+            r.append( (ns,c) )
+    else :
+        r = []
+        r.append( ([],0) )
+
+    return r
+
+def parse_boolean_query( terms ):
+    def truncated_powerset_query(ps, keept, fields):
+        q = []
+        for s,count in ps :
+            if count >= keept : ## if the sequence qualifies.
+                terms = []
+                for t in s: ## the sequence of words must be present.
+                    frf = [] ## if the word is present in any of the fields.
+                    for f in fields:
+                        frf.append( Term(f, t) )
+                    terms.append( Or(frf) )
+
+                q.append( And(terms) )
+
+        return q
+    tc = len(terms)
+    keept = tc - tc//5 # minimum sequence of correct elements.
+    ps = powerset(terms, tc)
+    query = Or(truncated_powerset_query( ps, keept, ["content","headline"]))
+
+    return query
 
 """Simple reader-writer locks in Python
 Many readers can hold the lock XOR one and only one writer"""
