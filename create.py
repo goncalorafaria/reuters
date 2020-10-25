@@ -43,7 +43,12 @@ def process_topics(path="./topics.txt",dir="."):
                     elif reg[0] == '</top':
                         None
                     elif reg[0] == '<num':
-                        code = reg[1].split(" ")[-1]
+                        ss = reg[1].split(" ")
+                        if len(ss[-1]) > 0 :
+                            code = ss[-1]
+                        else :
+                            code = ss[-2]
+
                     elif reg[0] == '<title':
                         title = " ".join(reg[1].split(" ")[1:])
                     elif reg[0] == '<desc':
@@ -110,9 +115,12 @@ def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, 
         shards = ndocs//NUM_WORKERS
 
         for i in range(NUM_WORKERS-1):
-            BucketChunks(
-                docs[i*shards:(i+1)*shards], fnames[i*shards:(i+1)*shards], dir).dump( i )
+            bc = BucketChunks(
+                        docs[i*shards:(i+1)*shards], fnames[i*shards:(i+1)*shards], dir)
+            bc.dump( i )
+            del bc
 
         i = NUM_WORKERS-1
-        BucketChunks(
-                docs[i*shards:], fnames[i*shards:], dir).dump( i )
+        bc = BucketChunks(
+                docs[i*shards:], fnames[i*shards:], dir)
+        bc.dump( i )

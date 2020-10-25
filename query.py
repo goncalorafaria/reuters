@@ -5,6 +5,10 @@ from core import BucketChunks, Bucket
 
 collection = Bucket(debug=True)
 
+#def evaluate(q, relevance):
+
+
+#########
 r = collection.ranking("R197", model= Bucket.Model.TF_IDF, limit=2)
 
 for id_, sc in r :
@@ -12,8 +16,8 @@ for id_, sc in r :
     print( sc )
     print( collection.get_document(id_)["headline"] )
 
+#########
 
-"""
 k = 5
 leaveout = k//5
 
@@ -30,9 +34,4 @@ ids = collection.boolean_query("R197", k=5, expantion = Bucket.Extension.Bo2)
 print(ids)
 docs = collection.get_documents(ids)
 
-for d in docs:
-    print(d["headline"])
-
 print( [ d["headline"] for d in docs ])
-
-"""

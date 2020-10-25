@@ -18,6 +18,8 @@ class BucketChunks():
         self.count = len(docs)
         self.docind = {}
 
+        print( ":number of docs: "+ str(self.count) )
+
         if index :
             for i in range(self.count):
                 self.docind[fnames[i]] = i
@@ -52,7 +54,7 @@ class BucketChunks():
     #        "merge_entities","merge_subtokens"])
         tmp = blist([])
         ktmp = blist([])
-
+        placedate =None
         while batomic.get() or (not sharedqueue.empty()):
             try:
                 xml_as_bytes, document = sharedqueue.get(False,500+random.randint(0, 1000))
@@ -72,15 +74,18 @@ class BucketChunks():
 
                 if mdline is not None:
                     dateline = mdline.text
+                    placedate = dateline.split(" ")
                 else :
                     dateline = None
+                    placedate = [" "]
 
                 #stream.append(" ".join(dt))
                 #stream.append(headline)
                 #"text": " ".join([ token.lemma_ for token in nlp(" ".join(dt))]),
                 #"headline": " ".join([ token.lemma_ for token in nlp(headline) if not (token.is_punct or token.is_stop) ]),
                 fname = itemid
-                placedate = dateline.split(" ")
+                #placedate = dateline.split(" ")
+
 
                 doc = {
                     "text": " ".join(dt),#" ".join([ token.lemma_ for token in nlp(" ".join(dt)) if not (token.is_punct or token.is_stop) ]),
@@ -94,6 +99,8 @@ class BucketChunks():
 
             except Exception as e:
                 #print(e)
+                #print(type(e))
+                #print(placedate)
                 None
 
         return BucketChunks(tmp, ktmp, ".", index=True)
