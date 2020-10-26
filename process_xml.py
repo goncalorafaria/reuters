@@ -1,26 +1,31 @@
 import glob
 import os
 from time import time
+from os.path import join
 
 from core import BucketChunks
 from create import process_documents, process_topics
 
+#rcvdir = "../proj/"
+if __name__ == '__main__':
+    assert len(sys.argv) > 2, "specify the number of workers and dir."
+    assert int(sys.argv[1]) > 0, "number of shards must be a positive number."
 
-#documents = glob.glob("exampletxt/*.txt")
-documents = [ i for a in os.listdir("../proj/rcv1/") for i in glob.glob("../proj/rcv1/" + a + "/*.xml") ]
+    workers = int(sys.argv[1])
+    rcvdir = sys.argv[2]
 
-#documents =documents[:20000]
+    coldir = join(rcvdir,"rcv1/")
 
-start_time = time()
+    documents = [ i for a in os.listdir(coldir) for i in glob.glob( join(join(coldir,a),"/*.xml") ) ]
 
-process_documents(
-    documents = documents,
-    worker_function = BucketChunks.worker_function, ## maps collection into invertedIndexes objects.
-    NUM_WORKERS = 5, ## number of threads executing in the first stage the worker function , and in the second stage the reduce function.
-    QUEUE_SIZE = 80, ## number of documents in queue at every single point.
-    NUM_READERS = 2,
-    dir = ".") ## number of threads reading documents to the queue.
+    start_time = time()
 
-print("--- %s seconds ---" % (time() - start_time))
+    process_documents(
+        documents = documents,
+        worker_function = BucketChunks.worker_function, ## maps collection into invertedIndexes objects.
+        NUM_WORKERS = workers , ## number of threads executing in the first stage the worker function , and in the second stage the reduce function.
+        QUEUE_SIZE = 80, ## number of documents in queue at every single point.
+        NUM_READERS = 2,
+        dir = ".") ## number of threads reading documents to the queue.
 
-#print(a)
+    print("--- %s seconds ---" % (time() - start_time))
