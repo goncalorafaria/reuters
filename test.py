@@ -68,17 +68,24 @@ def eval(qtrain, pred):
     return results, reduce_ps, reduce_rs
 
 
-#pred1 = [ set(collection.boolean_query(qcode, Bucket.Extension.KL, k=5)) for qcode in qtrain.keys() ]
+#pred1 = [ set(collection.boolean_query(qcode, Bucket.Extension.KL, k=3)) for qcode in qtrain.keys() ]
 #result, reduce_ps, reduce_rs = eval(qtrain, pred1)
 
-#ranking(self, qcode, model, limit=20)
+#print( "".join(collection.topics.docs["R102"]["narr"].split("\"") ) )
+
+
+#s = collection.ranking("R102", Bucket.Model.TF_IDF, limit=10)
+
+#print(s)
+
+
 pred2 = [ set([ a for a,b in collection.ranking(qcode, Bucket.Model.TF_IDF, limit=10)]) for qcode in qtrain.keys() ]
 
 print(pred2)
 
 result, reduce_ps, reduce_rs = eval(qtrain, pred2)
 
-print(reduce_ps)
-print(reduce_rs)
+#print(reduce_ps)
+#print(reduce_rs)
 
 #print(collection.topics.docs.keys())

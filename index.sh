@@ -4,5 +4,3 @@ py process_xml.py
 
 echo "Indexing everything."
 py build.py 5
-
- 

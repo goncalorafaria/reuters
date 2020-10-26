@@ -129,7 +129,7 @@ class Bucket():
         self.weighting = Bucket.model_calls[weighting.value-1]
 
     def boolean_query(self, qcode, expantion, k=5):
-
+        print(qcode)
         self.set_weighting_method(Bucket.Model.FREQUENCY)
 
         tt = self.get_topics_terms(
@@ -156,13 +156,17 @@ class Bucket():
 
     def ranking(self, qcode, model, limit=20):
 
+        print(qcode)
+
         self.set_weighting_method(model)
 
         topic = self.topics.docs[qcode]
 
-        #group=OrGroup
+        querysnip = topic["narr"]+"  "+topic["title"]
+        txt = "".join(querysnip.split("\""))
+
         q = MultifieldParser(["headline","content"],
-                    self.ix.schema,group=OrGroup).parse(topic["narr"]+"  "+topic["title"])
+                    self.ix.schema,group=OrGroup).parse(txt)
 
         with self.ix.searcher(weighting=self.weighting) as searcher:
                 results = searcher.search(q,  limit=limit)
@@ -174,8 +178,13 @@ class Bucket():
     def get_topics_terms(self,code, expantion, limit=5):
 
         topic = self.topics.docs[code]
+
+        querysnip = topic["narr"]+"  "+topic["title"]
+        txt = "".join(querysnip.split("\""))
+
         with self.ix.searcher(weighting=self.weighting) as searcher:
-            r1 = searcher.key_terms_from_text("content", topic["narr"] +"  "+ topic["title"],
+
+            r1 = searcher.key_terms_from_text("content", txt,
                     model= Bucket.extension_calls[expantion.value-1], numterms=limit)
 
         terms = set(list(zip(*r1))[0])

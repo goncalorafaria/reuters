@@ -19,7 +19,7 @@ def work(it, sdir):
     ana = RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
 
     schema = Schema(headline = KEYWORD(lowercase=True, field_boost=2.0,analyzer=ana),
-                    content= TEXT(lang="en" ,analyzer=ana),
+                    content= TEXT(lang="en", phrase=False, chars=False, analyzer=ana,vector=True),
                     name=ID(unique=True, stored=True, sortable=True))
 
     ix = index.create_in("indexdir", schema=schema, indexname="usages")
