@@ -3,8 +3,10 @@
 ## processing xml and creating bucket chunks.
 COLLECTION_DIR = ../proj/
 
-python3 process_xml.py 5 $COLLECTION_DIR
+NUM_WORKERS = 4
+
+python3 process_xml.py $NUM_WORKERS $COLLECTION_DIR
 
 ## indexing the bucket chunks w/ whoosh.
-python build.py 5
+python3 build.py $NUM_WORKERS
 
