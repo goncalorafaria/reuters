@@ -1,5 +1,27 @@
 import threading
 from whoosh.query import Term, And,Or
+#from whoosh.analysis import *
+#from collections import Counter
+#from core import Bucket
+
+def parse_feedback(path="./qrels.train"):
+    qset = {}
+    with open(path, "r") as xml:
+        s = xml.read()
+
+        cols = s.split("\n")
+        for cs in cols:
+            entry = cs.split(" ")
+            if len(entry) == 3:
+                code = entry[0]
+                doc = entry[1]
+                relevant = (int(entry[2])==1)
+                if code in qset:
+                    qset[code].append( (doc, relevant) )
+                else:
+                    qset[code] = [ (doc, relevant) ]
+
+    return qset
 
 """
 This function returns the power set.

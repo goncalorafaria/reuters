@@ -1,26 +1,6 @@
 from core import BucketChunks, Bucket
+from utils import parse_feedback
 
-
-path="./qrels.train"
-
-def parse_feedback(path="./qrels.train"):
-    qset = {}
-    with open(path, "r") as xml:
-        s = xml.read()
-
-        cols = s.split("\n")
-        for cs in cols:
-            entry = cs.split(" ")
-            if len(entry) == 3:
-                code = entry[0]
-                doc = entry[1]
-                relevant = (int(entry[2])==1)
-                if code in qset:
-                    qset[code].append( (doc, relevant) )
-                else:
-                    qset[code] = [ (doc, relevant) ]
-
-    return qset
 
 qtrain = parse_feedback("./qrels.train")
 qtest = parse_feedback("./qrels.test")
@@ -68,24 +48,24 @@ def eval(qtrain, pred):
     return results, reduce_ps, reduce_rs
 
 
-#pred1 = [ set(collection.boolean_query(qcode, Bucket.Extension.KL, k=3)) for qcode in qtrain.keys() ]
-#result, reduce_ps, reduce_rs = eval(qtrain, pred1)
+k = 3
+extension = Bucket.Extension.KL
+
+pred1 = [ set(collection.boolean_query(qcode, extension, k=k)) for qcode in qtrain.keys() ]
+result, reduce_ps, reduce_rs = eval(qtrain, pred1)
 
 #print( "".join(collection.topics.docs["R102"]["narr"].split("\"") ) )
-
-
 #s = collection.ranking("R102", Bucket.Model.TF_IDF, limit=10)
 
 #print(s)
 
+limit = 10
+model = Bucket.Model.TF_IDF,
 
-pred2 = [ set([ a for a,b in collection.ranking(qcode, Bucket.Model.TF_IDF, limit=10)]) for qcode in qtrain.keys() ]
-
-print(pred2)
-
+pred2 = [ set([ a for a,b in collection.ranking(qcode, model, limit=limit)]) for qcode in qtrain.keys() ]
 result, reduce_ps, reduce_rs = eval(qtrain, pred2)
 
-#print(reduce_ps)
-#print(reduce_rs)
+print(reduce_ps)
+print(reduce_rs)
 
 #print(collection.topics.docs.keys())

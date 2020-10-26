@@ -5,9 +5,13 @@ from lxml import etree as etree_lxml
 from whoosh.qparser import *
 from whoosh.classify import Bo1Model, Bo2Model, KLModel
 from whoosh.scoring import *
+from whoosh.analysis import *
 from enum import Enum
 from utils import parse_boolean_query
 from time import time
+from collections import Counter
+import numpy as np
+from math import log
 
 from os.path import join
 from whoosh import index
@@ -223,3 +227,56 @@ class Bucket():
 
     def get_document(self, name):
         return self.get_documents([name])[0]
+
+
+def get_topics_tfidf(collection, qtrain, smoothing = 0.01, field="name"):
+    intra = {}
+    for q, list in qtrain.items() :
+        intra[q]=[]
+        for id_, b in list :
+            if b :
+                intra[q].append(id_)
+
+    ana = RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
+
+    uterms = []
+    tfs = {}
+
+    for q, ids_ in intra.items():
+        docs = collection.get_documents(ids_)
+        inventory = Counter()
+        tfs[q] = [ Counter([ token.text for token in ana(d["text"])]) for d in docs ]
+        bows = [ set(i.keys()) for i in tfs[q]]
+        qbow = set.union(*bows)
+        uterms.append(qbow)
+
+    allterms = set.union(*uterms)
+
+    with collection.ix.searcher(weighting=Bucket.Model.TF_IDF) as searcher:
+        wmodel = TF_IDF()
+        bigtable = { t: wmodel.idf( searcher, "content", t) for t in allterms }
+
+    tidf = { q : [ { t: log(1+f)*bigtable[t] for t,f in d.items() } for d in dds ] for q, dds in tfs.items() }
+
+    n = len(allterms)
+
+    indcov = { t: i for t, i in zip(allterms,range(n)) }
+
+    y = {}
+    x = []
+    i=0
+    for q, dds in tfs.items():
+        s = i
+        for dd in dds:
+            vi  = np.ones((n))*smoothing
+            for k,value in dd.items():
+                vi[ indcov[k] ] = value
+            #y.append(q)
+            x.append(vi)
+        i+=len(dds)
+        y[q] = (s,i)
+
+
+    X = np.array(x)
+
+    return X, y
