@@ -7,6 +7,8 @@ from create import process_documents
 from build import build_index
 from eval import eval
 
+import numpy as np
+
 #documents = [ i for a in os.listdir("../proj/rcv1/") for i in glob.glob("../proj/rcv1/" + a + "/*.xml") ]
 
 def indexing(documents, SHARDS=5, dir =".", debug=False):
@@ -39,7 +41,10 @@ def indexing(documents, SHARDS=5, dir =".", debug=False):
 
     collection = Bucket(chunks=SHARDS, debug=False)
 
-    return collection, timetaken, None
+    #dbytes = sum([ os.path.getsize("bin/" + i) for i in os.listdir('bin')])
+    igB = sum([ os.path.getsize(dir +"/indexdir/" + i) for i in os.listdir(dir + '/indexdir')])/float(1024*1024*1024)
+
+    return collection, timetaken, igB
 
 def extract_topic_query(collection, qcode, k, model=Bucket.Model.TF_IDF):
     """
@@ -62,7 +67,7 @@ def boolean_query(qcode, collection, k, model=Bucket.Model.TF_IDF):
     *important: the Boolean querying should tolerate up toround(0.2×k)term mismatches
     """
 
-    return collection.boolean_query( qcode, model=model, k=k)
+    return collection.boolean_query( qcode,  model=model, k=k)
 
 def ranking(collection, qcode, limit, model = Bucket.Model.TF_IDF):
     """
@@ -76,7 +81,8 @@ def ranking(collection, qcode, limit, model = Bucket.Model.TF_IDF):
 
     return collection.ranking(qcode, model, limit=limit)
 
-def evaluation(collection, rtest, ranked=False, **kwargs):
+
+def evaluation(qtest,rtest,dtest,ranked=True, model=Bucket.Model.TF_IDF, **kwargs):
     """
     evaluation(Qtest,Rtest,Dtest,args):
     @input          set of topics Qtest ⊆ Q, document collection Dtest, relevance feedback Rtest,
@@ -91,47 +97,50 @@ def evaluation(collection, rtest, ranked=False, **kwargs):
     note: the input arguments are given in the form
             rtest =  topic -> [ ( doc.id, bool(relevance) ) ]
     """
-    # rtest =  topic -> [ ( docids, bool ) ]
-    # measure = "bref", "classic", "all"
-    if "model" in kwargs:
-        model = kwargs["model"]
+    if "beta" in kwargs:
+        beta= kwargs["beta"]
     else:
-        model = Bucket.Model.TF_IDF
+        beta=0.5
+
+    if "collection" in kwargs:
+        collection= kwargs["collection"]
+    else:
+        collection, timetaken, _ = indexing(dtest, SHARDS=5, dir =".", debug=False)
+        print( ("time",timetaken) )
 
     if ranked :
 
         if "limit" in kwargs:
             limit = kwargs["limit"]
         else:
-            limit = 10
+            limit = 1000
 
-        pred = { qcode : set([ a for a,b in collection.ranking(qcode, model, limit=limit)]) for qcode in rtest.keys() }
-        result, reduce_ps, reduce_rs, reduce_rb = eval(rtest, pred)
+        pred = { qcode : set([ a for a,b in collection.ranking(qcode, model, limit=limit)]) for qcode in qtest }
 
-    else :
+    else:
 
         if "k" in kwargs:
             k = kwargs["k"]
         else:
             k = 3
 
-        if "extension" in kwargs:
-            extension = kwargs["extension"]
-        else:
-            extension =  Bucket.Extension.Bo1
-
-        pred = { qcode : set(collection.boolean_query(qcode, extension, model=model, k=k)) for qcode in rtest.keys() }
-        result, reduce_ps, reduce_rs, reduce_rb = eval(rtest, pred)
-
-    return result, reduce_ps, reduce_rs, reduce_rb
+        pred = { qcode : set(collection.boolean_query(qcode, model=model, k=k)) for qcode in qtest }
 
 
+    ### doing the work.
 
-"""
- def myFun(**kwargs):
-    for key, value in kwargs.items():
-        print ("%s == %s" %(key, value))
+    result, measures = eval(rtest, pred, beta=beta)
 
-# Driver code
-myFun(first ='Geeks', mid ='for', last='Geeks')
-"""
+    reduced = {}
+
+    for k in measures:
+        reduced[k] = []
+
+    for _,v in result.items():
+        for k, nv in v.items():
+            reduced[k].append(nv)
+
+    for k in measures:
+        reduced[k] = ( np.mean(reduced[k]), np.std(reduced[k]) )
+
+    return result, reduced

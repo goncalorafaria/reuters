@@ -134,17 +134,16 @@ class Bucket():
 
     def boolean_query(self, qcode, model, expantion=None, k=5):
         #print(qcode)
-        self.set_weighting_method(model)
 
         tt = self.get_topics_terms(
                     code=qcode, limit=k,
                     expantion=expantion, model=model)
 
-        print(tt)
+        #print(tt)
 
         query = parse_boolean_query(tt)
 
-        print(query)
+        #print(query)
 
         with self.ix.searcher(weighting=self.weighting) as searcher:
             results = searcher.search(query,  limit=None, sortedby="name")
@@ -164,7 +163,7 @@ class Bucket():
 
     def ranking(self, qcode, model, limit=20):
 
-        print(qcode)
+        #print(qcode)
 
         self.set_weighting_method(model)
 
@@ -183,7 +182,9 @@ class Bucket():
 
         return r
 
-    def get_topics_terms(self,code, model,expantion=None, limit=5 ):
+    def get_topics_terms(self,code, model, expantion=None, limit=5 ):
+
+        self.set_weighting_method(model)
 
         topic = self.topics.docs[code]
 
