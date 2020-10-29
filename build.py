@@ -10,16 +10,16 @@ from core import BucketChunks
 
 #assert len(sys.argv) > 1, "You need to specify the number of chunks."
 
-def work(it, sdir):
+def work(it, sdir,debug):
 
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")
 
     #anah = CommaSeparatedTokenizer() |  IntraWordFilter(mergewords=False) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
     ana = RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
-
+    #ana = RegexTokenizer()
     schema = Schema(headline = KEYWORD(lowercase=True, field_boost=2.0,analyzer=ana),
-                    content= TEXT(lang="en", phrase=False, chars=False, analyzer=ana,vector=True),
+                    content= TEXT(lang="en", phrase=False, chars=False, analyzer=ana,vector=False),
                     name=ID(unique=True, stored=True, sortable=True))
 
     ix = index.create_in("indexdir", schema=schema, indexname="usages")
@@ -32,10 +32,14 @@ def work(it, sdir):
     #   stem_ana.clear()
     j = 0
     for i in it:
-        print( "Processing the chunk: " + str(i) )
-        doc = BucketChunks.load(sdir, i)
 
-        for d in tqdm(doc.docs):
+        doc = BucketChunks.load(sdir, i)
+        if debug :
+            print( "Processing the chunk: " + str(i) )
+            it = tqdm(doc.docs)
+        else:
+            it = doc.docs
+        for d in it:
             writer.add_document(name=d["itemid"],headline=d["headline"], content=d["text"])
 
         writer.commit()
@@ -44,13 +48,13 @@ def work(it, sdir):
         del doc
         j+=1
 
-def build_index(num_shards=5, sdir="."):
+def build_index(num_shards=5, sdir=".",debug=True):
     #assert len(sys.argv) > 1, "specify the number of shards."
     #assert int(sys.argv[1]) > 0, "number of shards must be a positive number."
     #SHARDS = int(sys.argv[1])
     start_time = time()
 
-    work(range(num_shards),sdir)
+    work(range(num_shards),sdir,debug)
 
     return (time() - start_time)
 
@@ -59,5 +63,5 @@ if __name__ == '__main__':
     assert int(sys.argv[1]) > 0, "number of shards must be a positive number."
     SHARDS = int(sys.argv[1])
 
-    timetaken = build_index(num_shards=5)
+    timetaken = build_index(num_shards=SHARDS)
     print("--- %s seconds ---" % (timetaken))

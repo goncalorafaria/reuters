@@ -22,7 +22,7 @@ class BucketChunks():
         self.count = len(docs)
         self.docind = {}
 
-        print( ":number of docs: "+ str(self.count) )
+        #print( ":number of docs: "+ str(self.count) )
 
         if index :
             for i in range(self.count):
@@ -132,15 +132,19 @@ class Bucket():
         #print(weighting.value)
         self.weighting = Bucket.model_calls[weighting.value-1]
 
-    def boolean_query(self, qcode, expantion, k=5):
-        print(qcode)
-        self.set_weighting_method(Bucket.Model.FREQUENCY)
+    def boolean_query(self, qcode, model, expantion=None, k=5):
+        #print(qcode)
+        self.set_weighting_method(model)
 
         tt = self.get_topics_terms(
                     code=qcode, limit=k,
-                    expantion=expantion)
+                    expantion=expantion, model=model)
+
+        print(tt)
 
         query = parse_boolean_query(tt)
+
+        print(query)
 
         with self.ix.searcher(weighting=self.weighting) as searcher:
             results = searcher.search(query,  limit=None, sortedby="name")
@@ -179,30 +183,26 @@ class Bucket():
 
         return r
 
-    def get_topics_terms(self,code, expantion, limit=5):
+    def get_topics_terms(self,code, model,expantion=None, limit=5 ):
 
         topic = self.topics.docs[code]
 
         querysnip = topic["narr"]+"  "+topic["title"]
         txt = "".join(querysnip.split("\""))
 
+        ana = RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
+
+        txt = " ".join([tk.text for tk in ana(txt)])
+
         with self.ix.searcher(weighting=self.weighting) as searcher:
 
-            r1 = searcher.key_terms_from_text("content", txt,
-                    model= Bucket.extension_calls[expantion.value-1], numterms=limit)
+            tl = [ (token.text,self.weighting.idf( searcher,"content",token.text)) for token in ana(txt) ]
 
-        terms = set(list(zip(*r1))[0])
-        """
-        r = set()
-        s = []
-        for t,_ in ans:
-            if t not in r:
-                s.append(t)
-                r.add(t)
-            if len(r) == limit:
-                break
-        """
-        return terms
+        tl = [ (k[0],(v*k[1])) for k,v in Counter(tl).items() ]
+
+        tl.sort(reverse=True,key= (lambda a : a[1]) )
+
+        return set([ a for a,b in tl[:limit]])
 
     def get_documents(self, res_list):
 

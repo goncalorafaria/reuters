@@ -5,7 +5,7 @@ from time import time
 from core import BucketChunks, Bucket
 from create import process_documents
 from build import build_index
-from utils import eval
+from eval import eval
 
 #documents = [ i for a in os.listdir("../proj/rcv1/") for i in glob.glob("../proj/rcv1/" + a + "/*.xml") ]
 
@@ -26,21 +26,22 @@ def indexing(documents, SHARDS=5, dir =".", debug=False):
         NUM_WORKERS = SHARDS, ## number of threads executing in the first stage the worker function , and in the second stage the reduce function.
         QUEUE_SIZE = 40, ## number of documents in queue at every single point.
         NUM_READERS = 2,
-        dir = dir) ## number of threads reading documents to the queue.
+        dir = dir,
+        debug=debug) ## number of threads reading documents to the queue.
 
     timetaken1 = (time()-start_time)
-    timetaken2 = build_index(SHARDS, sdir=dir)
+    timetaken2 = build_index(SHARDS, sdir=dir,debug=debug)
 
     print("time taken in part1 : "+ str(timetaken1))
     print("time taken in part2 : "+ str(timetaken2))
 
     timetaken = timetaken1 + timetaken2
 
-    collection = Bucket(debug=False)
+    collection = Bucket(chunks=SHARDS, debug=False)
 
     return collection, timetaken, None
 
-def extract_topic_query(collection, qcode, k, extension=Bucket.Extension.Bo2):
+def extract_topic_query(collection, qcode, k, model=Bucket.Model.TF_IDF):
     """
     extract_topic_query(q,I,k,args):
         @input      topic q ∈ Q(identifer), inverted indexI, number of top terms for thetopic (k), and optional arguments on scoring
@@ -48,9 +49,9 @@ def extract_topic_query(collection, qcode, k, extension=Bucket.Extension.Bo2):
         @output     list of k terms (a term can be either a word or phrase)
     """
 
-    return collection.get_topics_terms(qcode, extension, limit=k)
+    return collection.get_topics_terms(qcode, model=model, limit=k)
 
-def boolean_query(qcode, collection, k, extension ):
+def boolean_query(qcode, collection, k, model=Bucket.Model.TF_IDF):
     """
     boolean_query(q,k,I,args):
         @input      topicq(identifier), number of top terms k, and index I
@@ -61,7 +62,7 @@ def boolean_query(qcode, collection, k, extension ):
     *important: the Boolean querying should tolerate up toround(0.2×k)term mismatches
     """
 
-    return collection.boolean_query( qcode, extension, k=k)
+    return collection.boolean_query( qcode, model=model, k=k)
 
 def ranking(collection, qcode, limit, model = Bucket.Model.TF_IDF):
     """
@@ -73,9 +74,9 @@ def ranking(collection, qcode, limit, model = Bucket.Model.TF_IDF):
 
     """
 
-    return collection.ranking(qcode, model, limit=limit, **kwargs)
+    return collection.ranking(qcode, model, limit=limit)
 
-def evaluation(collection, rtest, ranked=False,  ):
+def evaluation(collection, rtest, ranked=False, **kwargs):
     """
     evaluation(Qtest,Rtest,Dtest,args):
     @input          set of topics Qtest ⊆ Q, document collection Dtest, relevance feedback Rtest,
@@ -91,6 +92,11 @@ def evaluation(collection, rtest, ranked=False,  ):
             rtest =  topic -> [ ( doc.id, bool(relevance) ) ]
     """
     # rtest =  topic -> [ ( docids, bool ) ]
+    # measure = "bref", "classic", "all"
+    if "model" in kwargs:
+        model = kwargs["model"]
+    else:
+        model = Bucket.Model.TF_IDF
 
     if ranked :
 
@@ -99,14 +105,8 @@ def evaluation(collection, rtest, ranked=False,  ):
         else:
             limit = 10
 
-        if "model" in kwargs:
-            model = kwargs["model"]
-        else:
-            model = Bucket.Model.TF_IDF,
-
-
-        pred = [ set([ a for a,b in collection.ranking(qcode, model, limit=limit)]) for qcode in rtest.keys() ]
-        result, reduce_ps, reduce_rs = eval(qtrain, pred2)
+        pred = { qcode : set([ a for a,b in collection.ranking(qcode, model, limit=limit)]) for qcode in rtest.keys() }
+        result, reduce_ps, reduce_rs, reduce_rb = eval(rtest, pred)
 
     else :
 
@@ -116,14 +116,14 @@ def evaluation(collection, rtest, ranked=False,  ):
             k = 3
 
         if "extension" in kwargs:
-            model = kwargs["extension"]
+            extension = kwargs["extension"]
         else:
-            model =  Bucket.Extension.Bo1
+            extension =  Bucket.Extension.Bo1
 
-        pred = [ set(collection.boolean_query(qcode, extension, k=k)) for qcode in rtest.keys() ]
-        result, reduce_ps, reduce_rs = eval(qtrain, pred)
+        pred = { qcode : set(collection.boolean_query(qcode, extension, model=model, k=k)) for qcode in rtest.keys() }
+        result, reduce_ps, reduce_rs, reduce_rb = eval(rtest, pred)
 
-    return result, reduce_ps, reduce_rs
+    return result, reduce_ps, reduce_rs, reduce_rb
 
 
 

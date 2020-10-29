@@ -1,44 +1,34 @@
 import threading
 from whoosh.query import Term, And,Or
-#from whoosh.analysis import *
-#from collections import Counter
+from whoosh.analysis import *
+from collections import Counter
+from tqdm import tqdm
+
 #from core import Bucket
 
-def eval(qtrain, pred):
-    tkeys = list(qtrain.keys())
-    results = []
-    for topic in tkeys:
-        y_true = { d : bo for d,bo in qtrain[topic]}
-        y_pred = pred[topic]
+def get_hypercounter(collection, pos = True):
 
-        entry = {}
-        relevant = len([ i for i,bo in y_true.items() if bo ])
-        retrieved = len(y_pred)
-        inset=0
-        correct=0
-        for i in y_pred :
-            if i in y_true :
-                inset+=1
-                if y_true[i]:
-                    correct+=1
+    assert collection.debug, " Collection must be in debug mode."
+    redu = Counter()
 
-        if inset != 0:
-            precision = correct/inset
-        else:
-            precision = 0
+    if pos:
+        pipe= RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
+    else:
+        pipe = RegexTokenizer()
 
-        recall = correct/relevant
 
-        entry["precision"] = precision
-        entry["recall"] = recall
-        results.append( entry )
+    for chunk in tqdm(collection.chunks):
+        for doc in tqdm(chunk.docs):
+            redu.update([i.text for i in pipe(doc["text"])])
 
-    ps = [ i["precision"] for i in results]
-    rs = [ i["recall"] for i in results ]
-    reduce_ps = sum(ps)/len(ps)
-    reduce_rs = sum(rs)/len(rs)
+    #redu = Counter()
 
-    return results, reduce_ps, reduce_rs
+    print("reducing.")
+
+    #for c in tqdm(corpus):
+    #    redu = redu + c
+
+    return redu
 
 def parse_feedback(path="./qrels.train"):
     qset = {}

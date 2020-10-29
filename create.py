@@ -17,9 +17,13 @@ from time import time
 ## Pstings: Term , [Posting]
 
 def reader_function(args):
-    docs, sharedqueue, batomic , id, barrier = args
+    docs, sharedqueue, batomic , id, barrier, debug = args
     print("number of docs:" + str(len(docs)))
-    for d in tqdm(docs):
+
+    if debug :
+        docs = tqdm(docs)
+
+    for d in docs:
         with open(d,"rb") as df:
             sharedqueue.put( (df.read(),d) )
 
@@ -67,7 +71,7 @@ def process_topics(path="./topics.txt",dir="."):
     BucketChunks(docs, None, dir, index=False).dump(0, name="topicchunk")
 
 
-def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, NUM_READERS=1,dir="."):
+def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, NUM_READERS=1,dir=".",debug=True):
 
     assert NUM_WORKERS > 0, " Must have  a postive number of workers"
     assert NUM_READERS > 0, " Must have  a postive number of readers"
@@ -93,9 +97,9 @@ def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, 
     ## creates NUM_READERS reader tasks.
     for i in range(NUM_READERS):
         if i+1 == NUM_READERS:
-            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal, i, barrier) )
+            executor.submit(reader_function, (documents[i*docs_per_thread:],sharedqueue, signal, i, barrier,debug) )
         else:
-            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal, i, barrier) )
+            executor.submit(reader_function, (documents[i*docs_per_thread :(i+1)*docs_per_thread],sharedqueue, signal, i, barrier,debug) )
 
     ## puts the worker threads reading the and processing the documents.
     if NUM_WORKERS > 1 :
@@ -119,12 +123,14 @@ def process_documents(documents, worker_function, NUM_WORKERS=3, QUEUE_SIZE=20, 
         shards = ndocs//NUM_WORKERS
 
         for i in range(NUM_WORKERS-1):
+            print(("chunk",i))
             bc = BucketChunks(
                         docs[i*shards:(i+1)*shards], fnames[i*shards:(i+1)*shards], dir)
             bc.dump( i )
             del bc
 
         i = NUM_WORKERS-1
+        print(("chunk",i))
         bc = BucketChunks(
                 docs[i*shards:], fnames[i*shards:], dir)
         bc.dump( i )
