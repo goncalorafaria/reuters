@@ -6,6 +6,72 @@ from tqdm import tqdm
 
 #from core import Bucket
 
+def combSum(ranks):
+    tmp_dict = {}
+    for rank in ranks:
+        for elementid,value in rank:
+            if elementid in tmp_dict :
+                tmp_dict[elementid] += value
+            else:
+                tmp_dict[elementid] = value
+
+    l = [ (k,v) for k,v in tmp_dict.items()]
+    l.sort(reverse=True, key= (lambda a : a[1]))
+
+    return l
+
+def combMnz(ranks):
+    tmp_dict = {}
+    count_dict = {}
+
+    for rank in ranks:
+        for elementid,value in rank:
+
+            if value > 0:
+                if elementid in count_dict :
+                    count_dict[elementid] += 1
+                else :
+                    count_dict[elementid] = 1
+
+            if elementid in tmp_dict :
+                tmp_dict[elementid] += value
+            else:
+                tmp_dict[elementid] = value
+
+    for k, v in tmp_dict.items():
+        if k in count_dict:
+            tmp_dict[k] = v * count_dict[k]
+        else:
+            tmp_dict[k] = 0
+
+    l = [ (k,v) for k,v in tmp_dict.items()]
+    l.sort(reverse=True, key= (lambda a : a[1]))
+
+    return l
+
+def rrf(ranks, mitigation=80):
+
+    assert mitigation >= 0 , "Mitigation parameter must be greater than or equal to zero."
+
+    tmp_dict = {}
+
+    for i in range(0, len(ranks)):
+        j=0
+        for e,v in ranks[i]:
+            if e in tmp_dict:
+                tmp_dict[e] += 1.0/(mitigation + j)
+            else:
+                tmp_dict[e] = 1.0/(mitigation + j)
+
+            j+=1
+
+    l = [ (k,v) for k,v in tmp_dict.items()]
+    l.sort(reverse=True, key= (lambda a : a[1]))
+
+    return l
+
+
+
 def get_hypercounter(collection, pos = True):
 
     assert collection.debug, " Collection must be in debug mode."

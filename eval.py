@@ -63,7 +63,6 @@ def bref(pred,y_true):
         if d in non_relevant_a :
             i+=1
 
-
     if len(relevant_a_table) > 0 and len(relevant_a) > 0:
 
         if i == 0 :

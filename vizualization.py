@@ -1,4 +1,3 @@
-
 from utils import parse_feedback
 from core import Bucket, get_topics_tfidf
 from sklearn.metrics import pairwise_distances
@@ -45,17 +44,27 @@ def plot_avg_distance(X,y):
     plt.title("Relevant documents Distance")
     plt.show()
 
+
+def create_hypercounters(chunks=6):
+    collection = Bucket(chunks=chunks,debug=True)
+
+    hypercounter = get_hypercounter(collection, pos = False)
+    pickle.dump( hypercounter, open( "pre.hypercounter", "wb" ) )
+
+    hypercounter = get_hypercounter(collection, pos = True)
+    pickle.dump( hypercounter, open( "pos.hypercounter", "wb" ) )
+
 plot_intra_topic_distance(X,y)
     #topic_vec = [ np.mean( X[s:e,:], axis=0)for s,e in y.values() ]
     #None
 
 #print(c)
 
+def plot_dim_reduction(X):
+    X_embedded = MDS(n_components=2).fit_transform(X)
 
-#X_embedded = MDS(n_components=2).fit_transform(X)
-
-#plt.scatter(X_embedded[:,0], X_embedded[:,1], c = c)
-#plt.show()
+    plt.scatter(X_embedded[:,0], X_embedded[:,1], c = c)
+    plt.show()
 
 
 # print( { token.text for token in ana("I think this text is great")} )

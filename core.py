@@ -7,7 +7,7 @@ from whoosh.classify import Bo1Model, Bo2Model, KLModel
 from whoosh.scoring import *
 from whoosh.analysis import *
 from enum import Enum
-from utils import parse_boolean_query
+from utils import parse_boolean_query, rrf
 from time import time
 from collections import Counter
 import numpy as np
@@ -132,24 +132,9 @@ class Bucket():
         #print(weighting.value)
         self.weighting = Bucket.model_calls[weighting.value-1]
 
-    def boolean_query(self, qcode, model, expantion=None, k=5):
-        #print(qcode)
+    def boolean_query(self, qcode, model, k=5):
 
-        tt = self.get_topics_terms(
-                    code=qcode, limit=k,
-                    expantion=expantion, model=model)
-
-        #print(tt)
-
-        query = parse_boolean_query(tt)
-
-        #print(query)
-
-        with self.ix.searcher(weighting=self.weighting) as searcher:
-            results = searcher.search(query,  limit=None, sortedby="name")
-            results = [ r.values()[0] for r in results]
-
-        return results
+        return cononical_boolean_query(qcode, model= model.value, k=k, cache=self.topics.docs, ix = self.ix)
 
     def query(self, q, limit=10, sortedby="name", sort=False):
 
@@ -161,49 +146,17 @@ class Bucket():
 
         return results
 
-    def ranking(self, qcode, model, limit=20):
+    def ranking(self, qcode, model, limit=20, fusion=rrf):
+        if isinstance(model,list):
+            model = [ m.value for m in model ]
+        else:
+            model = model.value
 
-        #print(qcode)
+        return canonical_ranking(qcode, model=model.value, cache=self.topics.docs, limit=limit, fusion=rrf, ix = self.ix )
 
-        self.set_weighting_method(model)
 
-        topic = self.topics.docs[qcode]
-
-        querysnip = topic["narr"]+"  "+topic["title"]
-        txt = "".join(querysnip.split("\""))
-
-        q = MultifieldParser(["headline","content"],
-                    self.ix.schema,group=OrGroup).parse(txt)
-
-        with self.ix.searcher(weighting=self.weighting) as searcher:
-                results = searcher.search(q,  limit=limit)
-
-                r = [ (searcher.stored_fields(id_)["name"], sc) for id_,sc in results.items() ]
-
-        return r
-
-    def get_topics_terms(self,code, model, expantion=None, limit=5 ):
-
-        self.set_weighting_method(model)
-
-        topic = self.topics.docs[code]
-
-        querysnip = topic["narr"]+"  "+topic["title"]
-        txt = "".join(querysnip.split("\""))
-
-        ana = RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
-
-        txt = " ".join([tk.text for tk in ana(txt)])
-
-        with self.ix.searcher(weighting=self.weighting) as searcher:
-
-            tl = [ (token.text,self.weighting.idf( searcher,"content",token.text)) for token in ana(txt) ]
-
-        tl = [ (k[0],(v*k[1])) for k,v in Counter(tl).items() ]
-
-        tl.sort(reverse=True,key= (lambda a : a[1]) )
-
-        return set([ a for a,b in tl[:limit]])
+    def get_topics_terms(self,code, model, limit=5, cache=None, apart=False):
+        return cononical_get_topics_terms(code, model=model.value, limit=limit, cache=self.topics.docs, ix = self.ix)
 
     def get_documents(self, res_list):
 
@@ -281,3 +234,87 @@ def get_topics_tfidf(collection, qtrain, smoothing = 0.01, field="name"):
     X = np.array(x)
 
     return X, y
+
+
+def canonical_ranking(qcode, model, cache,limit=20, fusion= rrf ,ix = index.open_dir("indexdir", indexname="usages")):
+
+    if isinstance(model,list):
+        ranks = [ canonical_ranking(qcode, model=m, cache=cache, limit=limit, ix = ix ) for m in model ]
+        l = rrf(ranks)
+        if len(l) > limit :
+            return l[:limit]
+        else:
+            return l
+
+
+    wm = Bucket.model_calls[model-1]
+
+    topic = cache[qcode]
+
+    querysnip = topic["narr"]+"  "+topic["title"]
+
+    txt = "".join(querysnip.split("\""))
+
+    q = MultifieldParser(["headline","content"],
+                ix.schema,group=OrGroup).parse(txt)
+
+    with ix.searcher(weighting=wm) as searcher:
+            results = searcher.search(q,  limit=limit)
+
+            r = [ (searcher.stored_fields(id_)["name"], sc) for id_,sc in results.items() ]
+
+    return r
+
+def cononical_get_topics_terms(code, model, limit=5, cache=None, ix = index.open_dir("indexdir", indexname="usages")):
+
+    wm = Bucket.model_calls[model-1]
+
+    topic = cache[code]
+
+    querysnip = topic["narr"]+"  "+topic["title"]
+    txt = "".join(querysnip.split("\""))
+
+    ana = RegexTokenizer() |  IntraWordFilter(mergewords=True) | LowercaseFilter() | StopFilter(lang="en") | StemFilter(lang="en",cachesize=-1)
+
+    txt = " ".join([tk.text for tk in ana(txt)])
+
+    with ix.searcher(weighting=wm) as searcher:
+
+        tl = [ (token.text,wm.idf( searcher,"content",token.text)) for token in ana(txt) ]
+
+    tl = [ (k[0],(v*k[1])) for k,v in Counter(tl).items() ]
+
+    tl.sort(reverse=True,key= (lambda a : a[1]) )
+
+    return set([ a for a,b in tl[:limit]])
+
+def cononical_boolean_query(qcode, model, k=5, cache=None, ix = index.open_dir("indexdir", indexname="usages")):
+
+    wm = Bucket.model_calls[model-1]
+
+    tt = cononical_get_topics_terms(
+                code=qcode, limit=k, model=model, cache=cache)
+
+    query = parse_boolean_query(tt)
+
+    with ix.searcher(weighting=wm) as searcher:
+        results = searcher.search(query,  limit=None, sortedby="name")
+        results = [ r.values()[0] for r in results]
+
+    return results
+
+def bool_query_worker_function( qtest, model, k,cache, fusion=None):
+
+    pred = [ ( qcode,
+        set(cononical_boolean_query(qcode, model=model, k=k, cache=cache))
+        ) for qcode in qtest ]
+
+    return pred
+
+def rank_query_worker_function(qtest, model, limit, cache, fusion=rrf):
+
+    pred = [ ( qcode,
+        set([ a for a,b in canonical_ranking(qcode, model = model, limit=limit, cache=cache, fusion=fusion)])
+        ) for qcode in qtest ]
+
+    return pred
