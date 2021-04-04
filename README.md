@@ -1,4 +1,12 @@
 # reuters
+
+Creates an inverted index for the reuters collection.
+
+
+
+
+
+
 COLLECTION_DIR = ../proj/
 
 NUM_WORKERS = 4
